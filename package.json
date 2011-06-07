@@ -1,0 +1,14 @@
+{
+  "name"          : "socket.io-sessions",
+  "description"   : "Use your sessions from Connect, Express and others with Socket.IO",
+  "url"           : "http://github.com/aviddiviner/Socket.IO-sessions",
+  "keywords"      : ["connect", "express", "socket.io", "session", "sessions"],
+  "author"        : "David Irvine <aviddiviner@gmail.com>",
+  "contributors"  : [],
+  "licenses"      : ["MIT"],
+  "dependencies"  : [],
+  "main"          : "./index",
+  "version"       : "0.4.1",
+  "repository"    : "git://github.com/aviddiviner/Socket.IO-sessions.git",
+  "engines"       : { "node": ">= 0.4.1" }
+}
