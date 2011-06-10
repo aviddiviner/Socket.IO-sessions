@@ -6,7 +6,7 @@ var url = require('url'),
 var clientVersion = exports.version = '0.5.4';
 var clientPath = 'socket.io-sessions.js';
 var clientData = "\
-io.SessionSocket = function(sid, host, options){\
+io.SessionSocket = function(host, options){\
   io.Socket.apply(this, [host, options]);\
   this._sessionId = CONNECT_SID;\
   this.on('connect', function(){\

@@ -1,4 +1,4 @@
-io.SessionSocket = function(sid, host, options){
+io.SessionSocket = function(host, options){
   io.Socket.apply(this, [host, options]);
   this._sessionId = CONNECT_SID;
   this.on('connect', function(){
