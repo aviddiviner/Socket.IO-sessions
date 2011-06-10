@@ -19,39 +19,31 @@ The basic idea is that on new Socket.IO connection, you auto-magically have a ca
         io      = require('socket.io'),
         sio     = require('socket.io-sessions');
 
-    var store   = new MemoryStore;  // or RedisStore, etc
-    var app     = connect.createServer(...);  // With sessions
-    var socket  = io.listen(app);
+    var mystore = new MemoryStore;        // or RedisStore, etc
+    var app = connect.createServer(...);  // With sessions
 
-    var ssocket = sio.enable(socket, store);  // <-- The magic line
+    var socket = sio.enable({
+      socket: io.listen(app),         // Socket.IO listener
+      store:  mystore,                // Your session store
+      parser: connect.cookieParser()  // Cookie parser
+    });
 
-This adds a new event which you can listen for using `ssocket.on(...)`, namely `sconnection`. It looks something like this:
+This adds a new event which you can listen for using `socket.on(...)`, namely `sconnection`. It looks something like this:
 
-    ssocket.on('sconnection', function(client, session){
+    socket.on('sconnection', function(client, session){
         // Play with the session, saved on disconnect
     });
 
 #### Client
-On the client side, you need to include the `.js` code (see *Client Javascript* below) and then change your declaration to the following:
+On the client side, you simply need to include a link to the JS file and then construct using `new io.SessionSocket()` instead of `new io.Socket()`.
 
-    var sid = ...;  // App should pass this to your view
-    var socket = new io.SessionSocket(sid);
+    <script src="/socket.io/socket.io-sessions.js"></script>
+    <script>
+      var socket = new io.SessionSocket();
+      ...
+    </script>
 
-This passes the Connect/Express session ID to the client code so that it can tell the server who you are. You'll need to find a way to get the `sid` property in your view, of course. On Express, this is done like so:
-
-    // In your view (EJS):
-    var socket = new io.SessionSocket('<%= connect_sid %>');
-
-    // In your app:
-    app.get('/', function(req,res){
-        res.render('index.ejs', {
-            locals: { 
-                connect_sid: req.sessionID
-            }
-        }
-    });
-
-Messages are then sent from the client as usual with `socket.send(...)`. That's it! You're done. Feel free to read on if you'd like a more detailed explanation though.
+That's it! You're done. Everything else is as normal. Feel free to read on if you'd like a more detailed explanation though.
 
 
 
@@ -77,38 +69,45 @@ Let's have a better look at some example usage. Assuming we have the following b
     ).listen(3000);
 
     // Listen with Socket.IO
-    var socket = io.listen(app);
+    var iolistener = io.listen(app);
 
 To allow Socket.IO to access our sessions, we do the following:
 
     // Make Socket.IO session aware
-    var ssocket = sio.enable(socket, mystore);
+    var socket = sio.enable({
+      socket: iolistener,
+      store:  mystore,
+      parser: connect.cookieParser()
+    });
 
-This adds new events that we can listen for using the `ssocket.on(...)` listener. Let's take a look at how we use these.
+This adds new events that we can listen for using the `socket.on(...)` listener. Let's take a look at how we use these.
 
 ### Per-connection session handling
 This method loads the session from the store at the start of the connection, and then writes it on disconnect. You do this by adding a listener for the `sconnection` event, as follows:
-
-    var socket = sio.enable(io.listen(app), store);
 
     socket.on('sconnection', function(client, session){
         // Client connected, session loaded
         client.on('message', function(message){ ... });
         client.on('disconnect', function(){
-            // Client disconnected, session saved after this event
+            // Client disconnected, session saved after this callback
         });
     });
 
 It is worth noting that if your application crashes, then the post-disconnect callback will never be called. So any changes you made to the session while that connection was active would be lost.
 
 ### Per-message session handling
-This method will reload the session each time a message is received and then write it back to the store after firing the `smessage` callback. You use this as follows:
+This method will reload the session each time a message is received and then write it back to the store after firing the `smessage` callback. You use this by passing the `per_message:true` option, as follows:
 
-    var socket = sio.enable(io.listen(app), store, {per_message:1});
+    var socket = sio.enable({
+      socket: io.listen(app),
+      store:  mystore,
+      parser: connect.cookieParser(),
+      per_message: true   // <-- Add this option
+    });
 
     socket.on('sconnection', function(client){
         client.on('smessage', function(message, session){
-            // Play with the session, it gets saved after this event
+            // Play with the session, it gets saved after this callback
         });
         client.on('disconnect', function(){ ... });
     });
@@ -132,39 +131,71 @@ If you were using Express, then your app declaration would look something like t
     });
     app.listen(3000);
 
+### Expired session handling
+
+There is an extra event called `sinvalid` which is fired if the session isn't found in the session store or if there is an error retrieving it. This is handled as follows.
+
+    socket.on('sinvalid', function(client){
+        // Session invalid or not found in the store.
+        // Send the client some instructions to refresh.
+    });
+
+### Cutting cookies
+In each example above, we've included a `cookieParser()` callback. This callback is used so that when the browser requests the client Javascript file, it takes the session ID from its cookie and bundles this along with the client code.
+
+If you aren't using Connect or Express however, then you may be handling sessions differently. In this case you need to pass a callback that will allow the server to get the session ID from the given HTTP Request object, as follows:
+
+    var socket = sio.enable({
+      socket: io.listen(app),
+      store:  session_store,
+      cutter: myCookieCutter  // Note: cutter, not parser
+    });
+
+Here are two examples of such callbacks:
+
+    var connectCookieCutter = function(req){
+      var cookie = connect.utils.parseCookie(req.headers['cookie']);
+      return cookie['connect.sid'];
+    };
+
+    var expressCookieCutter = function(req){
+      var parser = express.cookieParser();
+      parser(req, null, function(){});
+      return req.cookies['connect.sid'];
+    };
+
+The session ID returned from this callback will be the ID used to retrieve the session data from the store using a call to `store.get(sid, ...)`.
+
 
 
 ## Client Configuration
-The client is configured as follows:
+The client configuration is really straightforward. All that is required is that the client JS link is included and then your client code is as usual, except using `var socket = io.SessionSocket()`.
 
-    var sid = ...;  // App should pass this to your view
-    var socket = new io.SessionSocket(sid);
+The default path to the client JS is `/socket.io/socket.io-sessions.js`. Note that if you change the default path of Socket.IO from `/socket.io`, using the `socket.options.resource` setting, then this will also change the base path of this client JS.
 
-Where the `sid` is the ID of the session in your store. This is retrieved by the server using a call to `store.get(sid, ...)`. The client is then used the same as normally.
+### Browser caching
+It is possible that the browser might cache the Javascript file, which can cause problems if the session expires or the session ID becomes invalid, since this is served inline with the JS. In this case, just add a timestamp to the link. If you're using express, this is how you do it:
 
-### Client Javascript
-The client-side Javascript is minimal. In fact, this is it in its entirety:
+    // In your view (EJS):
+    <script src="/socket.io/socket.io-sessions.js?<%= timestamp %>"></script>
 
-    io.SessionSocket = function(sid, host, options){
-      io.Socket.apply(this, [host, options]);
-      this._sessionId = sid;
-      this.on('connect', function(){
-        this.send({__sid:this._sessionId, connect:1});
-      });
-    }
-    io.util.inherit(io.SessionSocket, io.Socket);
-
-Feel free to put that in a `.js` file or on your page in some `<script>` tags.
+    // In your app:
+    app.get('/', function(req,res){
+        res.render('index.ejs', {
+            locals: { 
+                timestamp: (new Date()).getTime()
+            }
+        }
+    });
 
 ### Example page
 Let's take a look at an example HTML page:
 
     <script src="/js/jquery-1.6.1.js"></script>
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/path/to/client/js"></script>
+    <script src="/socket.io/socket.io-sessions.js"></script>
     <script>
-      var sid = ...;  // App should pass this to your view
-      var socket = new io.SessionSocket(sid);
+      var socket = new io.SessionSocket();
       socket.on('connect', function(){
         $('#msgbox').append('<b>Connect!</b>\n');
       });
@@ -178,12 +209,3 @@ Let's take a look at an example HTML page:
         onclick="socket.send({a:'ping'});" />
 
 
-
-## Expired Session Handling
-
-There is an extra event called `sinvalid` which is fired if the session isn't found in the session store or if there is an error retrieving it. This is handled as follows.
-
-    ssocket.on('sinvalid', function(client){
-        // Session invalid or not found in the store.
-        // Send the client some instructions to refresh.
-    });
