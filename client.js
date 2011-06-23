@@ -1,8 +1,7 @@
-io.SessionSocket = function(host, options){
-  io.Socket.apply(this, [host, options]);
-  this._sessionId = CONNECT_SID;
-  this.on('connect', function(){
-    this.send({__sid:this._sessionId, connect:1});
+io.connectWithSession = function(){
+  var socket = io.connect.apply(io, arguments);
+  socket.on('connect', function(){
+    this.emit('connect_with_session', {__sid:CONNECT_SID});
   });
+  return socket;
 };
-io.util.inherit(io.SessionSocket, io.Socket);

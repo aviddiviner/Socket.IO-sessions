@@ -55,13 +55,13 @@ Let's have a better look at some example usage. Assuming we have the following b
         sio     = require('socket.io-sessions');
 
     // Create the session store
-    var MemoryStore = require('connect/middleware/session/memory');
+    var MemoryStore = require('connect/lib/middleware/session/memory');
     mystore = new MemoryStore;
 
     // Create the webserver
     var app = connect.createServer(
         connect.cookieParser(),
-        connect.session({ store: mystore }),
+        connect.session({ secret:'faceroll here', store:mystore }),
         function(req, res, next){
             res.end('Hello World!');
             // var session = req.session;
