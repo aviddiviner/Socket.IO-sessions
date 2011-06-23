@@ -3,7 +3,7 @@ var url = require('url'),
 
 // Client-side Javascript
 
-var clientVersion = exports.version = '0.5.5';
+var clientVersion = exports.version = '0.6';
 var clientPath = '/socket.io-sessions.js';
 var clientData = "\
 io.connectWithSession = function(){\
