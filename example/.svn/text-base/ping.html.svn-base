@@ -1,0 +1,37 @@
+<html>
+<head>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/socket.io/socket.io-sessions.js"></script>
+  <script>
+    var logmsg = function(msg){
+      document.getElementById('msgbox').innerHTML += msg + '\n'; 
+    };
+
+    var socket = io.connectWithSession();
+    socket.on('connect', function(){
+      logmsg('<b>Connect!</b>');
+    });
+    socket.on('disconnect', function(){
+      logmsg('<b>Disconnect!</b>');
+    });
+    socket.on('message', function(message){
+      logmsg('Message: ' + JSON.stringify(message));
+    });
+    socket.on('hi', function(message){
+      logmsg('Hi: ' + JSON.stringify(message));
+    });
+
+/*
+  var socket = io.connect('/chat');
+  var news = io.connect('/news');
+  news.on('item', function(){
+    // do stuff
+  });
+*/
+  </script>
+</head>
+<body>
+  <input id="sendmsg" type="button" value="Ping!" onclick="socket.send('ping', function(){ logmsg('(msg sent)'); });" />
+  <pre id="msgbox"></pre>
+</body>
+</html>

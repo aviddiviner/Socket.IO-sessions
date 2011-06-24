@@ -35,11 +35,12 @@ This adds a new event which you can listen for using `socket.on(...)`, namely `s
     });
 
 #### Client
-On the client side, you simply need to include a link to the JS file and then construct using `new io.SessionSocket()` instead of `new io.Socket()`.
+On the client side, you simply need to include a link to the JS file and then connect using `io.connectWithSession()` instead of `io.connect()`.
 
+    <script src="/socket.io/socket.io.js"></script>
     <script src="/socket.io/socket.io-sessions.js"></script>
     <script>
-      var socket = new io.SessionSocket();
+      var socket = io.connectWithSession();
       ...
     </script>
 
@@ -61,17 +62,19 @@ Let's have a better look at some example usage. Assuming we have the following b
     // Create the webserver
     var app = connect.createServer(
         connect.cookieParser(),
-        connect.session({ secret:'faceroll here', store:mystore }),
+        connect.session({secret:'faceroll here', store:mystore}),
         function(req, res, next){
             res.end('Hello World!');
             // var session = req.session;
         }
-    ).listen(3000);
+    );
 
     // Listen with Socket.IO
     var iolistener = io.listen(app);
 
-To allow Socket.IO to access our sessions, we do the following:
+    app.listen(3000); // Start the webserver
+
+To allow Socket.IO to access our sessions, we insert the following:
 
     // Make Socket.IO session aware
     var socket = sio.enable({
@@ -191,21 +194,21 @@ It is possible that the browser might cache the Javascript file, which can cause
 ### Example page
 Let's take a look at an example HTML page:
 
-    <script src="/js/jquery-1.6.1.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script src="/socket.io/socket.io-sessions.js"></script>
     <script>
-      var socket = new io.SessionSocket();
+      var logmsg = function(msg){
+        document.getElementById('msgbox').innerHTML += msg + '\n'; 
+      };
+      var socket = io.connectWithSession();
       socket.on('connect', function(){
-        $('#msgbox').append('<b>Connect!</b>\n');
+        logmsg('<b>Connect!</b>');
       });
       socket.on('message', function(message){
-        $('#msgbox').append('Message: ' + JSON.stringify(message) + '\n');
+        logmsg('Message: ' + JSON.stringify(message));
       });
-      socket.connect();
     </script>
-    <pre id="msgbox"></pre>
     <input id="sendmsg" type="button" value="Ping!"
-        onclick="socket.send({a:'ping'});" />
-
+      onclick="socket.send('ping', function(){ logmsg('(msg sent)'); });" />
+    <pre id="msgbox"></pre>
 

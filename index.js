@@ -3,7 +3,7 @@ var url = require('url'),
 
 // Client-side Javascript
 
-var clientVersion = exports.version = '0.6';
+var clientVersion = exports.version = '0.6.1';
 var clientPath = '/socket.io-sessions.js';
 var clientData = "\
 io.connectWithSession = function(){\
@@ -63,10 +63,6 @@ function makeCookieCutter(parser){
   }
 }
 
-function logmsg(msg){
-  console.log("\033[31m" + msg + "\033[0m");
-}
-
 /**
  * Enables session handling on the socket.io socket.
  *
@@ -111,63 +107,43 @@ exports.enable = function(args){
 
     // Call all the other listeners down the stack
     for (var i = 0, len = listeners.length; i < len; i++){
-      listeners[i].call(this, req, res); // TODO: maybe set this => socket.server
+      listeners[i].call(this, req, res); // TODO: set this => socket.server?
     }
   });
 
-  // This doesn't seem to cause any kind of recursive explosion, so it's all good I guess. :)
   socket.sockets.on('connection', function(client){
     client.on('connect_with_session', function(sdata){
       if (sdata.__sid) {
-
         socket.log.info('client sent session ID, creating session-linked events');
-        //logmsg('got connect_with_session');
-        //logmsg(JSON.stringify(sdata));
-
         // Message-based session handling; read & write the session on each message.
         if (options.per_message) {
-
-          //logmsg('USING per_message');
-
           client.on('message', function(msg){
             store.get(sdata.__sid, function(error, session){
               if (error || !session) {
-                //logmsg('session invalid');
                 socket.emit('sinvalid', client);
               } else {
-                //logmsg('<read session data>');
-                // Can't use client.emit here, see SocketNamespace.prototype.emit
+                // Can't use client.emit here, see <socket.io> SocketNamespace.prototype.emit
                 process.EventEmitter.prototype.emit.apply(client, ['smessage', msg, session]);
                 store.set(sdata.__sid, session);
-                //logmsg('<saved session data>');
               }
             });
           });
-          //logmsg('SENDING OUT SCONNECTION');
           socket.emit('sconnection', client);
         }
         // Connection-based session handling; read & write the session once per connection.
         if (!options.per_message) {
-
-          //logmsg('NOT per_message');
-
           store.get(sdata.__sid, function(error, session){
             if (error || !session) {
-              //logmsg('session invalid');
               socket.emit('sinvalid', client);
             } else {
-              //logmsg('<read session data>');
-              //logmsg('SENDING OUT SCONNECTION');
               socket.emit('sconnection', client, session);
               client.on('disconnect', function(){
                 store.set(sdata.__sid, session);
-                //logmsg('<saved session data>');
               });
             }
           });
         }
       }
-
     });
   });
   return socket;
